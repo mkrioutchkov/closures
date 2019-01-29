@@ -1,0 +1,60 @@
+#include <iostream>
+#include <utility>
+#include <type_traits>
+#include <string>
+
+template<typename... CLOSURES>
+struct variable_closure : CLOSURES...
+{
+    template<typename... CLOSURES0>
+    explicit variable_closure(CLOSURES0&&... closures0)
+    : CLOSURES(std::forward<CLOSURES0>(closures0))... {}
+};
+
+template<typename... CLOSURES>
+variable_closure(CLOSURES&&... closures) -> variable_closure<std::remove_cvref_t<CLOSURES>...>;
+
+template<typename... CLOSURES0, typename... CLOSURES1>
+auto operator+(variable_closure<CLOSURES0...> closures0, variable_closure<CLOSURES1...> closures1)
+{
+    return variable_closure(static_cast<CLOSURES0&&>(closures0)..., static_cast<CLOSURES1&&>(closures1)...);
+}
+
+template<typename... CLOSURES0, typename... CLOSURES1>
+auto operator+(variable_closure<CLOSURES0...> closures0, CLOSURES1&&... closures1)
+{
+    return variable_closure(static_cast<CLOSURES0&&>(closures0)...) + variable_closure(std::forward<CLOSURES1>(closures1)...);
+}
+
+int main()
+{
+    auto lamb0 = [](){ std::cout << "i do nothing" << std::endl; };
+    auto lamb1 = [](int x){ std::cout << "x is " << x << std::endl; };
+    auto closures = variable_closure(lamb0, lamb1);
+    closures();
+    auto closures2 = closures + [](double d) { std::cout << "i print doubles " << d << std::endl; };
+    closures2();
+    closures2(3);
+    closures2(4.56);
+    
+    auto closures3 = variable_closure([](float f){ std::cout << f << " is a float" << std::endl; });
+    auto closures4 = closures3 + closures2;
+    closures4();
+    closures4(3);
+    closures4(4.56);
+    closures4(5.6f);
+    
+    auto lambWithData = [s = std::string("i own this string")](char) {
+        std::cout << "string: " << s << std::endl;
+    };
+    auto closures5 = closures4 + lambWithData;
+    closures5(char{});
+    lambWithData(char{});
+    auto closures6 = variable_closure(std::move(lambWithData));
+    auto closures7 = std::move(closures5);
+    closures6(char{});
+    closures7(char{});
+    
+    closures5(char{});
+    lambWithData(char{});
+}
